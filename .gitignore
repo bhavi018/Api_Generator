@@ -10,3 +10,14 @@ venv
 
 # Ignore OS files
 .DS_Store
+
+
+# Database Files
+*.db
+
+
+# Log Files
+*.log
+
+
+

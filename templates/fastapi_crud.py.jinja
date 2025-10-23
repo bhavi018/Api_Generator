@@ -1,0 +1,28 @@
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from auth import create_access_token, verify_token
+from database import Base, engine, get_db
+from models import {{ model_name }}, UserDB
+
+Base.metadata.create_all(bind=engine)
+app = FastAPI(title="{{ app_name }}")
+
+@app.post("/token")
+def login(org_id: str, role: str = "user"):
+    token = create_access_token(data={"org_id": org_id, "role": role})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/api/org/{{ org_id }}/{{ model_name.lower() }}/")
+def create_{{ model_name.lower() }}(
+        item: {{ model_name }},
+        db: Session = Depends(get_db),
+        token_data: dict = Depends(verify_token)
+    ):
+    if token_data["org_id"] != "{{ org_id }}" or token_data["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    db_item = UserDB(**item.dict())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item

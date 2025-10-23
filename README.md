@@ -4,19 +4,6 @@ A professional **FastAPI CRUD Code Generator** that automatically generates prod
 
 ---
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Demo](#-demo)
-- [Architecture](#-architecture)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [Project Structure](#-project-structure)
-- [API Documentation](#-api-documentation)
-- [Technologies Used](#-technologies-used)
-
----
-
 ## ✨ Features
 
 ### Core Functionality
@@ -231,18 +218,6 @@ Delete a user (Admin only)
    ```python
    from fastapi.middleware.cors import CORSMiddleware
    ```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ---
 

@@ -1,23 +1,62 @@
-# Ignore Python cache files
-__pycache__
-*.pyc
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# Ignore virtual environment
-venv
+# ========================
+# Virtual Environments
+# ========================
+venv/
+env/
+ENV/
 
-# Ignore .env files (API keys etc.)
+# ========================
+# Environment Variables
+# ========================
 .env
+*.env
 
-# Ignore OS files
-.DS_Store
-
-
-# Database Files
+# ========================
+# Databases
+# ========================
 *.db
+*.sqlite
+*.sqlite3
 
-
-# Log Files
+# ========================
+# Logs
+# ========================
 *.log
 
+# ========================
+# Distribution / Packaging
+# ========================
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
 
+# ========================
+# IDE / Editor Settings
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
 
+# ========================
+# OS Generated Files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Other
+# ========================
+__MACOSX/

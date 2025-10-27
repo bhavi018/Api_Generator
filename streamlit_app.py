@@ -1,22 +1,21 @@
 import streamlit as st
 import requests
 import json
+import os
 
-# Page configuration with custom theme
+# Page configuration
 st.set_page_config(
-    page_title="FastAPI Code Generator",
+    page_title="FastAPI Multi-Language Code Generator",
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS for professional styling
+# Custom CSS
 st.markdown(
     """
     <style>
-    .main {
-        padding: 2rem;
-    }
+    .main { padding: 2rem; }
     .stButton>button {
         width: 100%;
         border-radius: 8px;
@@ -50,13 +49,27 @@ st.markdown(
         padding-bottom: 0.5rem;
         border-bottom: 2px solid #e2e8f0;
     }
-    .metric-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        text-align: center;
+    .lang-badge {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-weight: 500;
+        margin: 0.2rem;
     }
+    .python-badge { background: #3776ab; color: white; }
+    .java-badge { background: #007396; color: white; }
+    .js-badge { background: #f7df1e; color: black; }
+    .csharp-badge { background: #239120; color: white; }
+    .security-badge { 
+        padding: 0.3rem 0.6rem; 
+        border-radius: 4px; 
+        font-size: 0.85rem; 
+        font-weight: 600;
+    }
+    .critical { background: #dc3545; color: white; }
+    .high { background: #fd7e14; color: white; }
+    .medium { background: #ffc107; color: black; }
+    .low { background: #28a745; color: white; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -71,13 +84,30 @@ if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 if "token" not in st.session_state:
     st.session_state.token = ""
+if "selected_language" not in st.session_state:
+    st.session_state.selected_language = "python"
+if "supported_languages" not in st.session_state:
+    st.session_state.supported_languages = []
+if "review_count" not in st.session_state:
+    st.session_state.review_count = 0
+if "anthropic_api_key" not in st.session_state:
+    st.session_state.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+# Fetch supported languages on startup
+if not st.session_state.supported_languages:
+    try:
+        response = requests.get("http://127.0.0.1:8000/supported_languages")
+        if response.status_code == 200:
+            st.session_state.supported_languages = response.json()["languages"]
+    except:
+        pass
 
 # Header
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.title("🚀 FastAPI Code Generator")
+    st.title("🚀 Multi-Language API Code Generator with AI")
     st.markdown(
-        "*Generate production-ready FastAPI code with SQLAlchemy & Authentication*"
+        "*Generate production-ready API code in Python, Java, JavaScript, or C# with AI-powered review*"
     )
 with col2:
     if st.session_state.token:
@@ -136,7 +166,7 @@ if not st.session_state.token:
     st.stop()
 
 # -------------------
-# Sidebar with Status
+# Sidebar
 # -------------------
 with st.sidebar:
     st.markdown("### 📊 Session Status")
@@ -148,6 +178,42 @@ with st.sidebar:
 
     st.divider()
 
+    # Platform Metrics
+    st.markdown("### 📈 Platform Metrics")
+    st.metric("Code Reviews", st.session_state.review_count)
+    st.metric("Languages Supported", 4)
+
+    st.divider()
+
+    # Language Badge Display
+    if st.session_state.supported_languages:
+        st.markdown("### 🌐 Supported Languages")
+        for lang in st.session_state.supported_languages:
+            badge_class = f"{lang['value']}-badge"
+            st.markdown(
+                f'<span class="lang-badge {badge_class}">{lang["name"]}</span>',
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+
+    # API Key Configuration
+    st.markdown("### 🔑 AI Configuration")
+    api_key_input = st.text_input(
+        "Anthropic API Key",
+        value=st.session_state.anthropic_api_key,
+        type="password",
+        help="Required for AI features",
+    )
+    if api_key_input != st.session_state.anthropic_api_key:
+        st.session_state.anthropic_api_key = api_key_input
+        st.success("✅ API Key updated")
+
+    if not st.session_state.anthropic_api_key:
+        st.warning("⚠️ Set API key to enable AI features")
+
+    st.divider()
+
     st.markdown("### 🎯 Quick Actions")
     if st.button("🔄 Refresh Session", use_container_width=True):
         st.rerun()
@@ -155,16 +221,6 @@ with st.sidebar:
     if st.button("🚪 Logout", use_container_width=True):
         st.session_state.token = ""
         st.rerun()
-
-    st.divider()
-    st.markdown("### 📚 Documentation")
-    st.markdown(
-        """
-    - [API Reference](#)
-    - [Setup Guide](#)
-    - [Best Practices](#)
-    """
-    )
 
 # -------------------
 # Step 1: Organization Setup
@@ -192,10 +248,8 @@ with col1:
 
 with col2:
     if st.session_state.org_id and st.session_state.api_key:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("#### ✅ Organization Active")
+        st.success("#### ✅ Organization Active")
         st.caption(f"**{st.session_state.org_name}**")
-        st.markdown("</div>", unsafe_allow_html=True)
 
 if create_btn:
     if not org_name.strip():
@@ -227,55 +281,93 @@ if create_btn:
                 st.error(f"❌ Error: {str(e)}")
 
 # -------------------
-# Step 2: Generate CRUD API Code
+# Step 2: Language Selection & Code Generation
 # -------------------
 if st.session_state.org_id:
     st.markdown(
-        '<div class="step-header">Step 2: Generate FastAPI CRUD Code</div>',
+        '<div class="step-header">Step 2: Select Language & Generate Code</div>',
         unsafe_allow_html=True,
     )
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown('<div class="info-card">', unsafe_allow_html=True)
-        st.markdown(
-            "Generate complete FastAPI code with authentication, database models, and CRUD operations"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Language Selection
+    st.markdown('<div class="info-card">', unsafe_allow_html=True)
+    st.markdown("#### 🌐 Choose Your Programming Language")
 
-    with col2:
+    col1, col2, col3, col4 = st.columns(4)
+
+    language_options = {
+        "Python": {"value": "python", "icon": "🐍", "framework": "FastAPI"},
+        "Java": {"value": "java", "icon": "☕", "framework": "Spring Boot"},
+        "JavaScript": {"value": "javascript", "icon": "🟨", "framework": "Express.js"},
+        "C#": {"value": "csharp", "icon": "💜", "framework": ".NET Core"},
+    }
+
+    cols = [col1, col2, col3, col4]
+    for idx, (lang_name, lang_info) in enumerate(language_options.items()):
+        with cols[idx]:
+            if st.button(
+                f"{lang_info['icon']} {lang_name}\n{lang_info['framework']}",
+                key=f"lang_{lang_info['value']}",
+                use_container_width=True,
+                type=(
+                    "primary"
+                    if st.session_state.selected_language == lang_info["value"]
+                    else "secondary"
+                ),
+            ):
+                st.session_state.selected_language = lang_info["value"]
+                st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Display selected language
+    st.info(f"**Selected Language:** {st.session_state.selected_language.upper()}")
+
+    # Generate Code Button
+    col_gen1, col_gen2, col_gen3 = st.columns([1, 1, 2])
+    with col_gen1:
         generate_btn = st.button(
             "⚡ Generate Code", type="primary", use_container_width=True
         )
 
     if generate_btn:
-        with st.spinner("Generating code..."):
+        with st.spinner(
+            f"Generating {st.session_state.selected_language.upper()} code..."
+        ):
             try:
                 code_res = requests.get(
                     "http://127.0.0.1:8000/generate_sample_code",
                     params={
                         "org_id": st.session_state.org_id,
                         "org_name": st.session_state.org_name,
+                        "language": st.session_state.selected_language,
                     },
                 )
                 if code_res.status_code == 200:
                     code_data = code_res.json()
                     st.session_state.generated_code = code_data["generated_code"]
-                    st.success("✅ Code generated successfully!")
+                    st.session_state.file_extension = code_data["file_extension"]
+                    st.session_state.code_language = code_data["language"]
+                    st.success(
+                        f"✅ {st.session_state.selected_language.upper()} code generated successfully!"
+                    )
                     st.rerun()
                 else:
                     st.error("❌ Code generation failed")
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
+    # Display Generated Code
     if "generated_code" in st.session_state:
-        st.markdown("#### 📄 Generated FastAPI Code")
+        st.markdown("#### 📄 Generated API Code")
 
-        tab1, tab2 = st.tabs(["📝 View Code", "💾 Download"])
+        tab1, tab2, tab3 = st.tabs(["📝 View Code", "💾 Download", "📋 Copy"])
 
         with tab1:
             st.code(
-                st.session_state.generated_code, language="python", line_numbers=True
+                st.session_state.generated_code,
+                language=st.session_state.code_language,
+                line_numbers=True,
             )
 
         with tab2:
@@ -283,25 +375,290 @@ if st.session_state.org_id:
             with col_d2:
                 st.markdown('<div class="info-card">', unsafe_allow_html=True)
                 st.markdown("### Download Your Code")
-                st.markdown(
-                    f"**Filename:** `{st.session_state.org_name.lower()}_api.py`"
-                )
+                filename = f"{st.session_state.org_name.lower().replace(' ', '_')}_api{st.session_state.file_extension}"
+                st.markdown(f"**Filename:** `{filename}`")
                 st.download_button(
-                    label="⬇️ Download Python API Code",
+                    label=f"⬇️ Download {st.session_state.code_language.upper()} Code",
                     data=st.session_state.generated_code,
-                    file_name=f"{st.session_state.org_name.lower()}_api.py",
+                    file_name=filename,
                     mime="text/plain",
                     use_container_width=True,
                     type="primary",
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
 
+        with tab3:
+            st.text_area(
+                "Copy Code to Clipboard",
+                st.session_state.generated_code,
+                height=300,
+                help="Select all and copy (Ctrl+A, Ctrl+C)",
+            )
+
 # -------------------
-# Step 3: API Testing
+# Step 3: AI Code Review & Enhancement
 # -------------------
 if "generated_code" in st.session_state:
     st.markdown(
-        '<div class="step-header">Step 3: API Testing & Validation</div>',
+        '<div class="step-header">Step 3: AI Code Review & Enhancement</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not st.session_state.anthropic_api_key:
+        st.warning(
+            "⚠️ Please set your Anthropic API Key in the sidebar to use AI features"
+        )
+    else:
+        col_ai1, col_ai2, col_ai3 = st.columns(3)
+
+        with col_ai1:
+            review_btn = st.button(
+                "🤖 AI Code Review", type="primary", use_container_width=True
+            )
+
+        with col_ai2:
+            improve_btn = st.button(
+                "🔧 Improve Code", type="secondary", use_container_width=True
+            )
+
+        with col_ai3:
+            test_gen_btn = st.button(
+                "🧪 Generate Tests", type="secondary", use_container_width=True
+            )
+
+        # AI Code Review
+        if review_btn:
+            with st.spinner(
+                "🤖 AI is analyzing your code for security, performance, and best practices..."
+            ):
+                try:
+                    review_response = requests.post(
+                        "http://127.0.0.1:8000/ai/review_code",
+                        json={
+                            "code": st.session_state.generated_code,
+                            "language": st.session_state.selected_language,
+                            "api_key": st.session_state.anthropic_api_key,
+                        },
+                    )
+
+                    if review_response.status_code == 200:
+                        review_data = review_response.json()
+                        st.session_state.review_count += 1
+
+                        # Check for errors
+                        if "error" in review_data:
+                            st.error(f"❌ {review_data['error']}")
+                            if "message" in review_data:
+                                st.info(review_data["message"])
+                        else:
+                            st.success("✅ AI Code Review Completed!")
+
+                            # Overall Metrics
+                            st.markdown("#### 📊 Code Quality Metrics")
+                            col1, col2, col3, col4 = st.columns(4)
+
+                            with col1:
+                                score = review_data.get("overall_score", 0)
+                                score_color = (
+                                    "🟢" if score >= 8 else "🟡" if score >= 6 else "🔴"
+                                )
+                                st.metric("Overall Score", f"{score_color} {score}/10")
+
+                            metrics = review_data.get("code_quality_metrics", {})
+                            with col2:
+                                st.metric(
+                                    "Readability", f"{metrics.get('readability', 0)}/10"
+                                )
+                            with col3:
+                                st.metric(
+                                    "Maintainability",
+                                    f"{metrics.get('maintainability', 0)}/10",
+                                )
+                            with col4:
+                                st.metric(
+                                    "Testability", f"{metrics.get('testability', 0)}/10"
+                                )
+
+                            # Summary
+                            if "summary" in review_data:
+                                st.info(f"**Summary:** {review_data['summary']}")
+
+                            # Security Issues
+                            security_issues = review_data.get("security_issues", [])
+                            if security_issues:
+                                st.markdown("#### 🔒 Security Issues")
+                                for issue in security_issues:
+                                    severity = issue.get("severity", "low")
+                                    with st.expander(
+                                        f"⚠️ {severity.upper()}: {issue.get('issue', 'Security concern')}",
+                                        expanded=(severity in ["critical", "high"]),
+                                    ):
+                                        st.markdown(
+                                            f"**Line:** {issue.get('line', 'N/A')}"
+                                        )
+                                        st.markdown(
+                                            f"**Issue:** {issue.get('issue', 'N/A')}"
+                                        )
+                                        st.markdown(
+                                            f"**Recommendation:** {issue.get('recommendation', 'N/A')}"
+                                        )
+                                        if "example" in issue and issue["example"]:
+                                            st.code(
+                                                issue["example"],
+                                                language=st.session_state.code_language,
+                                            )
+                            else:
+                                st.success("✅ No security issues found!")
+
+                            # Performance Issues
+                            perf_issues = review_data.get("performance_issues", [])
+                            if perf_issues:
+                                st.markdown("#### ⚡ Performance Improvements")
+                                for issue in perf_issues:
+                                    with st.expander(
+                                        f"💡 {issue.get('issue', 'Performance issue')}"
+                                    ):
+                                        st.markdown(
+                                            f"**Line:** {issue.get('line', 'N/A')}"
+                                        )
+                                        st.markdown(
+                                            f"**Impact:** {issue.get('impact', 'N/A')}"
+                                        )
+                                        st.markdown(
+                                            f"**Fix:** {issue.get('recommendation', 'N/A')}"
+                                        )
+                            else:
+                                st.success("✅ No major performance issues!")
+
+                            # Best Practices
+                            best_practices = review_data.get("best_practices", [])
+                            if best_practices:
+                                st.markdown("#### 📚 Best Practices Suggestions")
+                                for practice in best_practices:
+                                    importance = practice.get("importance", "medium")
+                                    icon = (
+                                        "🔴"
+                                        if importance == "high"
+                                        else "🟡" if importance == "medium" else "🟢"
+                                    )
+                                    st.markdown(
+                                        f"{icon} **{practice.get('category', 'General')}**: {practice.get('suggestion', 'N/A')}"
+                                    )
+
+                            # Positive Aspects
+                            positive = review_data.get("positive_aspects", [])
+                            if positive:
+                                st.markdown("#### ✨ What's Good")
+                                for aspect in positive:
+                                    st.markdown(f"✓ {aspect}")
+                    else:
+                        st.error(
+                            f"❌ Review failed with status code: {review_response.status_code}"
+                        )
+
+                except Exception as e:
+                    st.error(f"❌ AI Review failed: {str(e)}")
+                    st.info(
+                        "💡 Make sure your Anthropic API key is valid and you have sufficient credits"
+                    )
+
+        # Code Improvement
+        if improve_btn:
+            with st.spinner("🔧 AI is improving your code..."):
+                try:
+                    improve_response = requests.post(
+                        "http://127.0.0.1:8000/ai/improve_code",
+                        json={
+                            "code": st.session_state.generated_code,
+                            "language": st.session_state.selected_language,
+                            "api_key": st.session_state.anthropic_api_key,
+                        },
+                    )
+
+                    if improve_response.status_code == 200:
+                        improved_data = improve_response.json()
+
+                        st.success("✅ Code Improved!")
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("##### 📝 Original Code")
+                            st.code(
+                                improved_data["original_code"][:1000] + "...",
+                                language=st.session_state.selected_language,
+                            )
+
+                        with col2:
+                            st.markdown("##### ✨ Improved Code")
+                            st.code(
+                                improved_data["improved_code"][:1000] + "...",
+                                language=st.session_state.selected_language,
+                            )
+
+                        # Option to replace
+                        if st.button("✅ Use Improved Version", type="primary"):
+                            st.session_state.generated_code = improved_data[
+                                "improved_code"
+                            ]
+                            st.success("Code updated! Scroll up to view.")
+                            st.rerun()
+
+                        # Download improved version
+                        st.download_button(
+                            "⬇️ Download Improved Code",
+                            improved_data["improved_code"],
+                            file_name=f"{st.session_state.org_name.lower()}_improved{st.session_state.file_extension}",
+                            mime="text/plain",
+                        )
+                    else:
+                        st.error("❌ Code improvement failed")
+
+                except Exception as e:
+                    st.error(f"❌ Improvement failed: {str(e)}")
+
+        # Test Generation
+        if test_gen_btn:
+            with st.spinner("🧪 Generating comprehensive test suite..."):
+                try:
+                    test_response = requests.post(
+                        "http://127.0.0.1:8000/ai/generate_tests",
+                        json={
+                            "code": st.session_state.generated_code,
+                            "language": st.session_state.selected_language,
+                            "api_key": st.session_state.anthropic_api_key,
+                        },
+                    )
+
+                    if test_response.status_code == 200:
+                        test_data = test_response.json()
+
+                        st.success(f"✅ Tests Generated using {test_data['framework']}")
+
+                        st.markdown("#### 🧪 Generated Test Suite")
+                        st.code(
+                            test_data["test_code"],
+                            language=st.session_state.selected_language,
+                        )
+
+                        st.download_button(
+                            "⬇️ Download Test Suite",
+                            test_data["test_code"],
+                            file_name=f"test_{st.session_state.org_name.lower()}{st.session_state.file_extension}",
+                            mime="text/plain",
+                            type="primary",
+                        )
+                    else:
+                        st.error("❌ Test generation failed")
+
+                except Exception as e:
+                    st.error(f"❌ Test generation failed: {str(e)}")
+
+# -------------------
+# Step 4: API Testing (Only for Python)
+# -------------------
+if "generated_code" in st.session_state and st.session_state.code_language == "python":
+    st.markdown(
+        '<div class="step-header">Step 4: API Testing & Validation</div>',
         unsafe_allow_html=True,
     )
 
@@ -394,21 +751,9 @@ st.divider()
 st.markdown(
     """
     <div style='text-align: center; color: #718096; padding: 2rem 0;'>
-        <p>FastAPI Code Generator v1.0 | Built with Streamlit</p>
+        <p>🤖 AI-Powered Multi-Language API Code Generator v2.0 | Built with Streamlit, FastAPI & Claude AI</p>
+        <p style='font-size: 0.9rem;'>Featuring: Multi-Language Generation • AI Code Review • Security Scanning • Test Generation</p>
     </div>
 """,
     unsafe_allow_html=True,
 )
-
-
-# {
-# "message":"User created"
-# "user":{
-# "employee_code":"EMP001"
-# "contact_no":"1234567890"
-# "valid_till":"2025-12-31T23:59:59"
-# "name":"John Doe"
-# "org_id":"3c3ebb9d-050e-5ad5-99f1-a16d8b14fe52"
-# "org_user_id":"user002"
-# "created_date":"2025-10-21T10:00:00"
-# }

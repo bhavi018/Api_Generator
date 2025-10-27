@@ -1,170 +1,70 @@
-# from fastapi import FastAPI, HTTPException
-# from fastapi.staticfiles import StaticFiles
-# from models import User
-# from utils import generate_org_id, generate_api_key
-# from storage import db
-# from datetime import datetime
-# from fastapi.responses import HTMLResponse
-
-# from fastapi import Request
-# from fastapi.responses import JSONResponse
-
-# # import openai
-
-# # Optional: Serve static files (for frontend chatbot)
-# # app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-# # Load OpenAI key from .env
-# # load_dotenv()
-# # openai.api_key = os.getenv("OPENAI_API_KEY")
-
-
-# app = FastAPI()
-
-
-# # ✅ Homepage route
-# @app.get("/", response_class=HTMLResponse)
-# def home():
-#     try:
-#         return open(
-#             "templates/index.html"
-#         ).read()  # ✅ FIX: try-except must wrap the whole logic
-#     except FileNotFoundError:
-#         raise HTTPException(status_code=500, detail="index.html not found")
-
-
-# @app.get("/generate_org")
-# def generate_org(name: str):
-#     org_id = generate_org_id(name)
-#     api_key = generate_api_key()
-#     base_url = f"/api/org/{org_id}/users/"
-
-#     # Initialize empty dict for this org
-#     if org_id not in db:
-#         db[org_id] = {}
-
-#     return {
-#         "message": "Org Created Successfully!",
-#         "organization_name": name,
-#         "org_id": org_id,
-#         "api_key": api_key,
-#         "base_url": base_url,
-#         "sample_endpoints": {
-#             "POST": base_url,
-#             "GET": base_url + "{org_user_id}",
-#             "PUT": base_url + "{org_user_id}",
-#             "DELETE": base_url + "{org_user_id}",
-#         },
-#     }
-
-
-# @app.post("/api/org/{org_id}/users/")
-# def create_user(org_id: str, user: User):
-#     if org_id not in db:
-#         raise HTTPException(status_code=404, detail="Organization not found")
-#     if user.org_user_id in db[org_id]:
-#         raise HTTPException(status_code=400, detail="User already exists")
-#     db[org_id][user.org_user_id] = user
-#     return {"message": "User created", "user": user}
-
-
-# @app.get("/api/org/{org_id}/users/{org_user_id}")
-# def get_user(org_id: str, org_user_id: str):
-#     if org_id not in db or org_user_id not in db[org_id]:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     return db[org_id][org_user_id]
-
-
-# @app.put("/api/org/{org_id}/users/{org_user_id}")
-# def update_user(org_id: str, org_user_id: str, updated_user: User):
-#     if org_id not in db or org_user_id not in db[org_id]:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     db[org_id][org_user_id] = updated_user
-#     return {"message": "User updated", "user": updated_user}
-
-
-# @app.delete("/api/org/{org_id}/users/{org_user_id}")
-# def delete_user(org_id: str, org_user_id: str):
-#     if org_id not in db or org_user_id not in db[org_id]:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     del db[org_id][org_user_id]
-#     return {"message": "User deleted"}
-
-
-# @app.get("/generate_sample_code")
-# def generate_sample_code(org_id: str, org_name: str):
-#     code = f"""
-# from fastapi import FastAPI, HTTPException
-# from pydantic import BaseModel
-# from typing import Dict
-# from datetime import datetime
-
-# app = FastAPI()
-
-# # In-memory DB
-# db: Dict[str, Dict[str, User]] = {{}}
-
-# class User(BaseModel):
-#     org_user_id: str
-#     name: str
-#     contact_no: str
-#     employee_code: str
-#     created_date: datetime
-#     valid_till: datetime
-
-# @app.get("/process")
-# def process(name: str = "world"):
-#     return {{"message": f"Hello, {{name}}!"}}
-
-# @app.post("/api/org/{org_id}/users/")
-# def create_user(user: User):
-#     if "{org_id}" not in db:
-#         db["{org_id}"] = {{}}
-#     if user.org_user_id in db["{org_id}"]:
-#         raise HTTPException(status_code=400, detail="User already exists")
-#     db["{org_id}"][user.org_user_id] = user
-#     return {{"message": "User created", "user": user}}
-
-# @app.get("/api/org/{org_id}/users/{{org_user_id}}")
-# def get_user(org_user_id: str):
-#     if "{org_id}" not in db or org_user_id not in db["{org_id}"]:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     return db["{org_id}"][org_user_id]
-
-# @app.put("/api/org/{org_id}/users/{{org_user_id}}")
-# def update_user(org_user_id: str, updated_user: User):
-#     if "{org_id}" not in db or org_user_id not in db["{org_id}"]:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     db["{org_id}"][org_user_id] = updated_user
-#     return {{"message": "User updated", "user": updated_user}}
-
-# @app.delete("/api/org/{org_id}/users/{{org_user_id}}")
-# def delete_user(org_user_id: str):
-#     if "{org_id}" in db and org_user_id in db["{org_id}"]:
-#         del db["{org_id}"][org_user_id]
-#         return {{"message": "User deleted"}}
-#     raise HTTPException(status_code=404, detail="User not found")
-# """
-#     return {"org_id": org_id, "org_name": org_name, "generated_code": code}
-
-
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 from models import User, UserDB
 from database import engine, Base, get_db
 from utils import generate_org_id, generate_api_key
+from auth import create_access_token, verify_token
+from code_translator import get_code_for_language
+from pydantic import BaseModel
+from typing import Optional
 
-Base.metadata.create_all(bind=engine)  # Create DB tables
+# Import AI reviewer functions
+try:
+    from ai_code_reviewer import (
+        review_generated_code,
+        get_code_improvements,
+        generate_code_tests,
+    )
 
-app = FastAPI(title="FastAPI Code Generator with SQLAlchemy")
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+    print("Warning: AI code reviewer not available. Install 'anthropic' package.")
 
-# ✅ Create organization (still in-memory, optional for API key generation)
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="FastAPI Code Generator with Multi-Language Support & AI Review",
+    description="Generate REST APIs in multiple languages with AI-powered code review",
+    version="2.0.0",
+)
+
 db_orgs = {}
+
+
+# Request models for AI features
+class CodeReviewRequest(BaseModel):
+    code: str
+    language: str
+    api_key: Optional[str] = None
+
+
+class CodeImprovementRequest(BaseModel):
+    code: str
+    language: str
+    api_key: Optional[str] = None
+
+
+@app.get("/")
+def read_root():
+    return {
+        "message": "FastAPI Code Generator API",
+        "version": "2.0",
+        "ai_available": AI_AVAILABLE,
+        "endpoints": {
+            "generate_org": "/generate_org",
+            "generate_code": "/generate_sample_code",
+            "ai_review": "/ai/review_code",
+            "ai_improve": "/ai/improve_code",
+            "ai_tests": "/ai/generate_tests",
+            "supported_languages": "/supported_languages",
+        },
+    }
 
 
 @app.get("/generate_org")
 def generate_org(name: str):
+    """Generate organization with unique ID and API key"""
     org_id = generate_org_id(name)
     api_key = generate_api_key()
     if org_id not in db_orgs:
@@ -178,7 +78,15 @@ def generate_org(name: str):
 
 
 @app.post("/api/org/{org_id}/users/")
-def create_user(org_id: str, user: User, db: Session = Depends(get_db)):
+def create_user(
+    org_id: str,
+    user: User,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(verify_token),
+):
+    """Create a new user (Admin only)"""
+    if token_data["org_id"] != org_id or token_data["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
     user_db = UserDB(**user.dict())
     db.add(user_db)
     try:
@@ -192,6 +100,7 @@ def create_user(org_id: str, user: User, db: Session = Depends(get_db)):
 
 @app.get("/api/org/{org_id}/users/{org_user_id}")
 def get_user(org_id: str, org_user_id: str, db: Session = Depends(get_db)):
+    """Get user by ID"""
     user = db.query(UserDB).filter_by(org_user_id=org_user_id, org_id=org_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -200,95 +109,213 @@ def get_user(org_id: str, org_user_id: str, db: Session = Depends(get_db)):
 
 @app.put("/api/org/{org_id}/users/{org_user_id}")
 def update_user(
-    org_id: str, org_user_id: str, updated_user: User, db: Session = Depends(get_db)
+    org_id: str,
+    org_user_id: str,
+    updated_user: User,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(verify_token),
 ):
+    """Update user (Admin only)"""
+    if token_data["org_id"] != org_id or token_data["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     user = db.query(UserDB).filter_by(org_user_id=org_user_id, org_id=org_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
     for key, value in updated_user.dict().items():
         setattr(user, key, value)
+
     db.commit()
     db.refresh(user)
     return {"message": "User updated", "user": user}
 
 
 @app.delete("/api/org/{org_id}/users/{org_user_id}")
-def delete_user(org_id: str, org_user_id: str, db: Session = Depends(get_db)):
+def delete_user(
+    org_id: str,
+    org_user_id: str,
+    db: Session = Depends(get_db),
+    token_data: dict = Depends(verify_token),
+):
+    """Delete user (Admin only)"""
+    if token_data["org_id"] != org_id or token_data["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     user = db.query(UserDB).filter_by(org_user_id=org_user_id, org_id=org_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}
 
 
-from auth import create_access_token, verify_token
-from fastapi import Depends
-
-
-# -------------------
-# Token Generation (Login)
-# -------------------
 @app.post("/token")
 def login(org_id: str, role: str = "user"):
-    # In a real app, verify user credentials
+    """Generate access token"""
     token = create_access_token(data={"org_id": org_id, "role": role})
     return {"access_token": token, "token_type": "bearer"}
 
 
-# -------------------
-# Secure CRUD with Roles
-# -------------------
-@app.post("/api/org/{org_id}/users/")
-def create_user(
-    org_id: str,
-    user: User,
-    db: Session = Depends(get_db),
-    token_data: dict = Depends(verify_token),
-):
-    if token_data["org_id"] != org_id or token_data["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
-    user_db = UserDB(**user.dict())
-    db.add(user_db)
-    db.commit()
-    db.refresh(user_db)
-    return {"message": "User created", "user": user_db}
+# --------------------------
+# Code Generation Endpoints
+# --------------------------
 
 
-# -------------------
-# Generate Sample CRUD Code (for Streamlit)
-# -------------------
 @app.get("/generate_sample_code")
-def generate_sample_code(org_id: str, org_name: str):
+def generate_sample_code(org_id: str, org_name: str, language: str = "python"):
     """
-    Returns a sample FastAPI CRUD Python code template for the given org.
+    Generate CRUD API code in specified programming language
+
+    Supported languages:
+    - python (FastAPI)
+    - java (Spring Boot)
+    - javascript (Node.js + Express)
+    - csharp (ASP.NET Core)
     """
-    sample_code = f"""
-from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from database import Base, engine, get_db
-from models import User, UserDB
-from auth import create_access_token, verify_token
+    result = get_code_for_language(language, org_id, org_name)
 
-Base.metadata.create_all(bind=engine)
-app = FastAPI(title="{org_name} CRUD API")
+    if "error" in result:
+        raise HTTPException(
+            status_code=400,
+            detail=result["error"],
+            headers={
+                "X-Supported-Languages": ",".join(result.get("supported_languages", []))
+            },
+        )
 
-@app.post("/api/org/{org_id}/users/")
-def create_user(user: User, db: Session = Depends(get_db), token_data: dict = Depends(verify_token)):
-    if token_data["org_id"] != "{org_id}" or token_data["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
-    user_db = UserDB(**user.dict())
-    db.add(user_db)
-    db.commit()
-    db.refresh(user_db)
-    return user_db
+    return {
+        "generated_code": result["code"],
+        "language": result["language"],
+        "file_extension": result["extension"],
+        "mime_type": result["mime_type"],
+        "org_id": org_id,
+        "org_name": org_name,
+    }
 
-@app.get("/api/org/{org_id}/users/{{user_id}}")
-def get_user(user_id: str, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter_by(org_user_id=user_id, org_id="{org_id}").first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-"""
-    return {"generated_code": sample_code}
+
+@app.get("/supported_languages")
+def get_supported_languages():
+    """Get list of supported programming languages"""
+    return {
+        "languages": [
+            {
+                "name": "Python",
+                "value": "python",
+                "framework": "FastAPI",
+                "description": "High-performance async Python web framework",
+            },
+            {
+                "name": "Java",
+                "value": "java",
+                "framework": "Spring Boot",
+                "description": "Enterprise-grade Java framework",
+            },
+            {
+                "name": "JavaScript",
+                "value": "javascript",
+                "framework": "Node.js + Express",
+                "description": "Fast, unopinionated web framework for Node.js",
+            },
+            {
+                "name": "C#",
+                "value": "csharp",
+                "framework": "ASP.NET Core",
+                "description": "Cross-platform .NET framework",
+            },
+        ]
+    }
+
+
+# --------------------------
+# AI Code Review Endpoints
+# --------------------------
+
+
+@app.post("/ai/review_code")
+def ai_review_code(request: CodeReviewRequest):
+    """
+    AI-powered code review
+    Analyzes security, performance, and best practices
+    """
+    if not AI_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="AI features not available. Install 'anthropic' package: pip install anthropic",
+        )
+
+    try:
+        review_result = review_generated_code(
+            request.code, request.language, request.api_key
+        )
+        return review_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI review failed: {str(e)}")
+
+
+@app.post("/ai/improve_code")
+def ai_improve_code(request: CodeImprovementRequest):
+    """
+    Get AI-improved version of code
+    Fixes security issues, optimizes performance, follows best practices
+    """
+    if not AI_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="AI features not available. Install 'anthropic' package: pip install anthropic",
+        )
+
+    try:
+        improved_code = get_code_improvements(
+            request.code, request.language, request.api_key
+        )
+        return {
+            "original_code": request.code,
+            "improved_code": improved_code,
+            "language": request.language,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Code improvement failed: {str(e)}"
+        )
+
+
+@app.post("/ai/generate_tests")
+def ai_generate_tests(request: CodeReviewRequest):
+    """
+    Generate comprehensive test suite for code
+    """
+    if not AI_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="AI features not available. Install 'anthropic' package: pip install anthropic",
+        )
+
+    try:
+        test_code = generate_code_tests(request.code, request.language, request.api_key)
+        return {
+            "test_code": test_code,
+            "language": request.language,
+            "framework": {
+                "python": "pytest",
+                "java": "JUnit 5",
+                "javascript": "Jest",
+                "csharp": "xUnit",
+            }.get(request.language.lower(), "standard testing framework"),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Test generation failed: {str(e)}")
+
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "ai_available": AI_AVAILABLE, "database": "connected"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

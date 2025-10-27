@@ -1,0 +1,8 @@
+@RestController
+@RequestMapping("/api/org/{{ org_id }}/users")
+public class UserController {
+    @PostMapping("/")
+    public String createUser(@RequestBody User user) {
+        return "User added successfully to {{ org_name }}";
+    }
+}
